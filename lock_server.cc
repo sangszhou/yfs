@@ -25,9 +25,10 @@ lock_server::stat(int clt, lock_protocol::lockid_t lid, int &r)
 lock_protocol::status
 lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r)
 {
+	printf("client %d acquire lock %lld\n", clt, lid);
 	pthread_mutex_lock(&m_);
 	lock_protocol::status ret = lock_protocol::OK;
-
+	
 	// require a new lock and assign to client directly
 	if(lock_status_.find(lid) == lock_status_.end()) { 
 		lock_status_[lid] = LOCKED;
@@ -47,7 +48,9 @@ lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r)
 lock_protocol::status
 lock_server::release(int clt, lock_protocol::lockid_t lid, int &r)
 {
+	printf("client %d release lock %lld\n", clt, lid);
 	pthread_mutex_lock(&m_);
+	
 	lock_protocol::status ret = lock_protocol::OK;
 	// check malicious release
 	if(lock_status_.find(lid) == lock_status_.end() ||

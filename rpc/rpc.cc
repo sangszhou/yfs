@@ -584,6 +584,7 @@ rpcs::dispatch(djob_t *j)
 
 	switch (stat){
 		case NEW: // new request
+		printf("NEW\n");
 			if(counting_){
 				updatestat(proc);
 			}
@@ -660,9 +661,40 @@ rpcs::rpcstate_t
 rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
 {
+	
 	ScopedLock rwl(&reply_window_m_);
 
-        // You fill this in for Lab 1.
+	std::list<reply_t> &replies = reply_window_[clt_nonce];
+
+	std::list<reply_t>::iterator it;
+	// clear old clt/xid pairs
+	for(it = replies.begin(); it != replies.end() && it->xid < xid_rep; ++it) {
+	  free(it->buf);
+	}
+
+	replies.erase(replies.begin(), it);
+	// look for correct spot in reply list
+	for(; it != replies.end() && it->xid < xid; ++it);
+	if(it != replies.end()) {
+	  // if xid <= previous xid_rep => FORGOTTEN
+	  if(it == replies.begin())
+	    return FORGOTTEN;
+	  if(it->xid == xid) {
+	    // xid known
+	    if(it->cb_present) {
+	     // if(PRINT_DEBUG) printf("Remembered rpc call from (clt, xid) = (%d, %d)\n", clt_nonce, xid);
+	      *b = it->buf;
+	      *sz = it->sz;
+	      return DONE;
+	    }
+	    else {
+	      //if(PRINT_DEBUG) printf("Rpc call in progress from (clt, xid) = (%d, %d)\n", clt_nonce, xid);
+	      return INPROGRESS;
+	    }
+	  }
+	}
+	
+	replies.insert(it, reply_t(xid));
 	return NEW;
 }
 
@@ -675,8 +707,18 @@ void
 rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 		char *b, int sz)
 {
+	
 	ScopedLock rwl(&reply_window_m_);
-        // You fill this in for Lab 1.
+
+	std::list<reply_t> &replies = reply_window_[clt_nonce];
+	std::list<reply_t>::iterator it;
+
+	for(it = replies.begin(); it != replies.end() && it->xid != xid; ++it);
+	if(it != replies.end()) {
+	  it->buf = b;
+	  it->sz = sz;
+	  it->cb_present = true;
+	}	
 }
 
 void
